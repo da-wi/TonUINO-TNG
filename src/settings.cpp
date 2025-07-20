@@ -16,7 +16,6 @@ namespace {
 // Nano Every: 256 byte
 // AiO:        512 byte (with framework-lgt8fx@1.0.6 emulated)
 // AiOplus:    256 byte
-// Esp32 Nano  256 byte (configured in EEPROM.begin())
 
 constexpr uint16_t startAddressFolderSettings =   0;
 constexpr uint16_t startAddressAdminSettings  = 100;
@@ -29,26 +28,11 @@ static_assert(buttonExtSC_buttons < maxExtraShortcuts, "Too many ExtraShortCuts"
 #endif
 }
 
-void Settings::init() {
-#ifdef TonUINO_Esp32
-  bool res = EEPROM.begin(endAddress);
-  LOG(settings_log, s_info, F("EEPROM begin: "), res);
-#endif
-}
-
-void Settings::commit() {
-#ifdef TonUINO_Esp32
-  bool res = EEPROM.commit();
-  LOG(settings_log, s_info, F("EEPROM commit: "), res);
-#endif
-}
-
 void Settings::clearEEPROM() {
   LOG(settings_log, s_info, F("clEEPROM"));
   for (uint16_t i = startAddressFolderSettings; i < endAddress; ++i) {
-    EEPROM_put(i, '\0');
+    EEPROM.write(i, '\0');
   }
-  commit();
 }
 
 void Settings::writeSettingsToFlash() {
@@ -61,10 +45,10 @@ void Settings::resetSettings() {
   LOG(settings_log, s_debug, F("resetSettings"));
   cookie               = cardCookie;
   version              =  2;
-  spkMaxVolume         = 25;
-  spkMinVolume         =  5;
-  spkInitVolume        = 15;
-  eq                   =  1;
+  spkMaxVolume         = 16;
+  spkMinVolume         =  1;
+  spkInitVolume        = 10;
+  eq                   =  2;
   dummy                =  0;
   standbyTimer         =  0;
   invertVolumeButtons  =  1;
@@ -78,9 +62,9 @@ void Settings::resetSettings() {
   adminMenuPin[2]      =  1;
   adminMenuPin[3]      =  1;
   pauseWhenCardRemoved =  0;
-  hpMaxVolume          = 25;
-  hpMinVolume          =  5;
-  hpInitVolume         = 15;
+  hpMaxVolume          = 16;
+  hpMinVolume          =  1;
+  hpInitVolume         = 5;
 
   writeSettingsToFlash();
 }
@@ -115,14 +99,11 @@ void Settings::loadSettingsFromFlash() {
 
 void Settings::writeFolderSettingToFlash(uint8_t folder, uint8_t track) {
   if (folder < 100)
-    EEPROM_put(folder, track);
+    EEPROM.write(folder, track);
 }
 
 uint8_t Settings::readFolderSettingFromFlash(uint8_t folder) {
-  uint8_t ret = 0;
-  if (folder < 100)
-    EEPROM_get(folder, ret);
-  return ret;
+  return (folder < 100)? EEPROM.read(folder) : 0;
 }
 
 void Settings::writeExtShortCutToFlash (uint8_t shortCut, const folderSettings& value) {
@@ -137,10 +118,6 @@ void Settings::readExtShortCutFromFlash(uint8_t shortCut,       folderSettings& 
 
 
 folderSettings Settings::getShortCut(uint8_t shortCut) {
-#ifdef TonUINO_Esp32
-  if (shortCut == 0)
-    return cardFromWeb;
-#endif
   if (shortCut > 0 && shortCut <= 4)
     return shortCuts[shortCut-1];
 #ifdef BUTTONS3X3
@@ -155,10 +132,6 @@ folderSettings Settings::getShortCut(uint8_t shortCut) {
 }
 
 void Settings::setShortCut(uint8_t shortCut, const folderSettings& value) {
-#ifdef TonUINO_Esp32
-  if (shortCut == 0)
-    cardFromWeb = value;
-#endif
   if (shortCut > 0 && shortCut <= 4) {
     shortCuts[shortCut-1] = value;
     // writeSettingsToFlash(); -- will be done in state machine
